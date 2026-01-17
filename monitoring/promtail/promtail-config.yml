@@ -1,0 +1,123 @@
+# monitoring/promtail/promtail-config.yml
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: info
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    tenant_id: fake
+
+scrape_configs:
+  # ===========================================
+  # Docker Container Logs
+  # ===========================================
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Lấy container name làm label
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      
+      # Lấy compose service name
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      
+      # Lấy compose project name
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+      
+      # Lấy container ID
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+      
+      # Thêm job label
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'job'
+      
+      # Filter: chỉ lấy logs từ containers có compose project
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        regex: '.+'
+        action: keep
+
+    pipeline_stages:
+      # ===========================================
+      # Parse JSON logs (từ Producer/Consumer)
+      # ===========================================
+      - match:
+          selector: '{service=~"data-producer|data-consumer"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  message: message
+                  event: event
+                  service: service
+                  timestamp: timestamp
+                  order_id: order_id
+                  category: category
+                  error: error
+                  error_type: error_type
+                  batch_size: batch_size
+                  duration_ms: duration_ms
+                  throughput_per_sec: throughput_per_sec
+            
+            # Set log level as label
+            - labels:
+                level:
+                event:
+            
+            # Set timestamp from log
+            - timestamp:
+                source: timestamp
+                format: RFC3339Nano
+                fallback_formats:
+                  - RFC3339
+            
+            # Extract metrics from logs (optional)
+            - metrics:
+                log_lines_total:
+                  type: Counter
+                  description: "Total log lines"
+                  source: message
+                  config:
+                    action: inc
+                    match_all: true
+
+      # ===========================================
+      # Parse Kafka logs
+      # ===========================================
+      - match:
+          selector: '{service="kafka"}'
+          stages:
+            - regex:
+                expression: '^\[(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})\] (?P<level>\w+) (?P<message>.*)'
+            - labels:
+                level:
+
+      # ===========================================
+      # Parse PostgreSQL logs
+      # ===========================================
+      - match:
+          selector: '{service="postgres"}'
+          stages:
+            - regex:
+                expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} \w+) \[(?P<pid>\d+)\] (?P<level>\w+):  (?P<message>.*)'
+            - labels:
+                level:
+
+      # ===========================================
+      # Default: keep raw log
+      # ===========================================
+      - match:
+          selector: '{level=""}'
+          stages:
+            - static_labels:
+                level: info

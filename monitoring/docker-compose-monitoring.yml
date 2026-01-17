@@ -1,0 +1,229 @@
+# monitoring/docker-compose.yml
+
+services:
+  # ===========================================
+  # Prometheus - Metrics Collection & Storage
+  # ===========================================
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    restart: unless-stopped
+    
+    # Command line arguments
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'        # Giữ data 15 ngày
+      - '--web.enable-lifecycle'                   # Cho phép reload config via API
+      - '--web.enable-admin-api'                   # Enable admin API
+      - '--web.enable-remote-write-receiver'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus_data:/prometheus
+    
+    ports:
+      - "9090:9090"
+    
+    networks:
+      - monitoring-net
+    
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================
+  # Alertmanager
+  # ===========================================
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+      - '--cluster.listen-address='
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+
+  # ===========================================
+  # Loki - Log Aggregation
+  # ===========================================
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - ./loki/rules:/loki/rules:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - monitoring-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================
+  # Promtail - Log Collector
+  # ===========================================
+  promtail:
+    image: grafana/promtail:3.3.2
+    container_name: promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/promtail-config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    ports:
+      - "9080:9080"
+    networks:
+      - monitoring-net
+    depends_on:
+      loki:
+        condition: service_healthy
+
+
+  # ===========================================
+  # Grafana - Visualization & Dashboards
+  # ===========================================
+  grafana:
+    image: grafana/grafana:12.3.1
+    container_name: grafana
+    restart: unless-stopped
+    
+    environment:
+      # Admin credentials
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      
+      # Server settings
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      
+      # Disable analytics
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      
+      # Feature toggles (Grafana 12 features)
+      - GF_FEATURE_TOGGLES_ENABLE=nestedFolders
+    volumes:
+      # Provisioning - auto setup datasources & dashboards
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      
+      # Dashboard JSON files - mount trực tiếp từ local 👇
+      - ./grafana/dashboards/overview:/var/lib/grafana/dashboards/overview:ro
+      - ./grafana/dashboards/infrastructure:/var/lib/grafana/dashboards/infrastructure:ro
+      - ./grafana/dashboards/applications:/var/lib/grafana/dashboards/applications:ro
+      - ./grafana/dashboards/logs:/var/lib/grafana/dashboards/logs:ro
+      - ./grafana/dashboards/tracing:/var/lib/grafana/dashboards/tracing:ro
+      # Persistent storage
+      - grafana_data:/var/lib/grafana
+    
+    ports:
+      - "3000:3000"
+    
+    networks:
+      - monitoring-net
+    
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ===========================================
+  # cAdvisor - Container Metrics
+  # ===========================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.51.0
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - monitoring-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ===========================================
+  # Jaeger - Distributed Tracing
+  # ===========================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    container_name: jaeger
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - LOG_LEVEL=info
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    networks:
+      - monitoring-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ===========================================
+# Volumes - Persistent Storage
+# ===========================================
+volumes:
+  prometheus_data:
+    name: prometheus_data
+  grafana_data:
+    name: grafana_data
+  grafana_dashboards:
+    name: grafana_dashboards
+  alertmanager_data:
+    name: alertmanager_data
+  loki_data:
+    name: loki_data
+# ===========================================
+# Networks - External Network
+# ===========================================
+networks:
+  monitoring-net:
+    external: true

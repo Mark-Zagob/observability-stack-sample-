@@ -1,0 +1,75 @@
+# loki/rules/alerts.yml
+
+groups:
+  - name: log_alerts
+    interval: 1m  # Evaluation interval
+    rules:
+      - alert: HighErrorLogRate
+        expr: |
+          sum(count_over_time({service=~"data-producer|data-consumer"} |~ "(?i)error" [5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+          category: logs
+        annotations:
+          summary: "High error rate in application logs"
+          description: "{{ $value }} ERROR logs detected in the last 5 minutes"
+
+      - alert: DatabaseConnectionError
+        expr: |
+          sum(count_over_time({service="data-consumer"} |~ "(?i)connection.*(error|failed)" [5m])) > 3
+        for: 1m
+        labels:
+          severity: critical
+          category: logs
+          service: database
+        annotations:
+          summary: "Database connection errors detected"
+          description: "{{ $value }} database connection errors in consumer logs"
+
+      - alert: KafkaConnectionError
+        expr: |
+          sum(count_over_time({service=~"data-producer|data-consumer"} |~ "(?i)kafka.*(error|failed)" [5m])) > 3
+        for: 1m
+        labels:
+          severity: critical
+          category: logs
+          service: kafka
+        annotations:
+          summary: "Kafka connection errors detected"
+          description: "{{ $value }} Kafka errors detected in application logs"
+
+      - alert: ExceptionDetected
+        expr: |
+          sum(count_over_time({service=~"data-producer|data-consumer"} |~ "(?i)(exception|traceback)" [5m])) > 5
+        for: 2m
+        labels:
+          severity: warning
+          category: logs
+        annotations:
+          summary: "Exception detected in logs"
+          description: "{{ $value }} exceptions or stack traces found in application logs"
+
+      - alert: NoLogsFromProducer
+        expr: |
+          sum(count_over_time({service="data-producer"} [5m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: logs
+          service: producer
+        annotations:
+          summary: "No logs from Producer"
+          description: "Producer has not generated any logs in the last 5 minutes"
+
+      - alert: NoLogsFromConsumer
+        expr: |
+          sum(count_over_time({service="data-consumer"} [5m])) == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: logs
+          service: consumer
+        annotations:
+          summary: "No logs from Consumer"
+          description: "Consumer has not generated any logs in the last 5 minutes"

@@ -1,0 +1,215 @@
+# monitoring/prometheus/rules/recording_rules.yml
+
+groups:
+  # ===========================================
+  # Container Metrics - Pre-computed
+  # ===========================================
+  - name: container_metrics
+    interval: 15s
+    rules:
+      - record: container:cpu_usage_percent:rate5m
+        expr: rate(container_cpu_usage_seconds_total{name=~".+"}[5m]) * 100
+
+      - record: container:memory_usage_bytes:current
+        expr: container_memory_usage_bytes{name=~".+"}
+
+      - record: container:memory_usage_percent:current
+        expr: |
+          (
+            container_memory_usage_bytes{name=~".+"} / 
+            container_spec_memory_limit_bytes{name=~".+"}
+          ) * 100
+          and
+          container_spec_memory_limit_bytes{name=~".+"} > 0
+
+      - record: container:network_receive_bytes:rate5m
+        expr: rate(container_network_receive_bytes_total{name=~".+"}[5m])
+
+      - record: container:network_transmit_bytes:rate5m
+        expr: rate(container_network_transmit_bytes_total{name=~".+"}[5m])
+
+      - record: container:cpu_usage_percent:total
+        expr: sum(rate(container_cpu_usage_seconds_total{name=~".+"}[5m])) * 100
+
+      - record: container:memory_usage_bytes:total
+        expr: sum(container_memory_usage_bytes{name=~".+"})
+
+      - record: container:count:total
+        expr: count(container_last_seen{name=~".+"})
+
+  # ===========================================
+  # RED Metrics - Producer
+  # ===========================================
+  - name: red_producer
+    interval: 15s
+    rules:
+      # Rate
+      - record: red:producer:rate_per_second
+        expr: sum(rate(pipeline_producer_messages_total{status="success"}[1m]))
+
+      - record: red:producer:rate_per_minute
+        expr: sum(rate(pipeline_producer_messages_total{status="success"}[1m])) * 60
+
+      # Errors
+      - record: red:producer:error_rate_percent
+        expr: |
+          (
+            sum(rate(pipeline_producer_messages_total{status="failed"}[5m])) /
+            (sum(rate(pipeline_producer_messages_total[5m])) + 0.001)
+          ) * 100
+
+      - record: red:producer:errors_per_minute
+        expr: sum(rate(pipeline_producer_errors_total[1m])) * 60
+
+      # Duration
+      - record: red:producer:latency_p50
+        expr: histogram_quantile(0.50, rate(pipeline_producer_message_duration_seconds_bucket[5m]))
+
+      - record: red:producer:latency_p95
+        expr: histogram_quantile(0.95, rate(pipeline_producer_message_duration_seconds_bucket[5m]))
+
+      - record: red:producer:latency_p99
+        expr: histogram_quantile(0.99, rate(pipeline_producer_message_duration_seconds_bucket[5m]))
+
+  # ===========================================
+  # RED Metrics - Consumer
+  # ===========================================
+  - name: red_consumer
+    interval: 15s
+    rules:
+      # Rate
+      - record: red:consumer:rate_per_second
+        expr: sum(rate(pipeline_consumer_messages_total{status="success"}[1m]))
+
+      - record: red:consumer:rate_per_minute
+        expr: sum(rate(pipeline_consumer_messages_total{status="success"}[1m])) * 60
+
+      - record: red:consumer:db_inserts_per_minute
+        expr: sum(rate(pipeline_consumer_db_operations_total{status="success"}[1m])) * 60
+
+      # Errors
+      - record: red:consumer:error_rate_percent
+        expr: |
+          (
+            sum(rate(pipeline_consumer_messages_total{status="failed"}[5m])) /
+            (sum(rate(pipeline_consumer_messages_total[5m])) + 0.001)
+          ) * 100
+
+      - record: red:consumer:errors_per_minute
+        expr: sum(rate(pipeline_consumer_errors_total[1m])) * 60
+
+      # Duration
+      - record: red:consumer:latency_p50
+        expr: histogram_quantile(0.50, rate(pipeline_consumer_batch_duration_seconds_bucket[5m]))
+
+      - record: red:consumer:latency_p95
+        expr: histogram_quantile(0.95, rate(pipeline_consumer_batch_duration_seconds_bucket[5m]))
+
+      - record: red:consumer:latency_p99
+        expr: histogram_quantile(0.99, rate(pipeline_consumer_batch_duration_seconds_bucket[5m]))
+
+      # End-to-End Latency
+      - record: red:e2e:latency_p50
+        expr: histogram_quantile(0.50, rate(pipeline_consumer_end_to_end_latency_seconds_bucket[5m]))
+
+      - record: red:e2e:latency_p95
+        expr: histogram_quantile(0.95, rate(pipeline_consumer_end_to_end_latency_seconds_bucket[5m]))
+
+      - record: red:e2e:latency_p99
+        expr: histogram_quantile(0.99, rate(pipeline_consumer_end_to_end_latency_seconds_bucket[5m]))
+
+  # ===========================================
+  # Business Metrics
+  # ===========================================
+  - name: business_metrics
+    interval: 15s
+    rules:
+      - record: business:orders:rate_per_minute
+        expr: sum(rate(pipeline_business_orders_total[1m])) * 60
+
+      - record: business:revenue:rate_per_minute
+        expr: sum(rate(pipeline_business_revenue_total[1m])) * 60
+
+      - record: business:avg_order_value
+        expr: |
+          sum(rate(pipeline_business_revenue_total[5m])) /
+          (sum(rate(pipeline_business_orders_total[5m])) + 0.001)
+
+      - record: business:orders_by_category:rate
+        expr: sum by (category) (rate(pipeline_business_orders_total[1m])) * 60
+
+      - record: business:revenue_by_category:rate
+        expr: sum by (category) (rate(pipeline_business_revenue_total[1m])) * 60
+
+  # ===========================================
+  # Kafka Metrics
+  # ===========================================
+  - name: kafka_metrics
+    interval: 15s
+    rules:
+      - record: kafka:messages_in:rate1m
+        expr: sum by (topic) (rate(kafka_topic_partition_current_offset[1m]))
+
+      - record: kafka:messages_in:rate1m:total
+        expr: sum(rate(kafka_topic_partition_current_offset[1m]))
+
+      - record: kafka:consumer_lag:total
+        expr: sum by (consumergroup, topic) (kafka_consumergroup_lag)
+
+      - record: kafka:consumer_lag:sum
+        expr: sum(kafka_consumergroup_lag)
+
+      - record: kafka:partitions:count
+        expr: sum(kafka_topic_partitions)
+
+  # ===========================================
+  # PostgreSQL Metrics
+  # ===========================================
+  - name: postgresql_metrics
+    interval: 15s
+    rules:
+      - record: postgresql:transactions:rate1m
+        expr: rate(pg_stat_database_xact_commit{datname="datawarehouse"}[1m])
+
+      - record: postgresql:rows_inserted:rate1m
+        expr: rate(pg_stat_database_tup_inserted{datname="datawarehouse"}[1m])
+
+      - record: postgresql:rows_fetched:rate1m
+        expr: rate(pg_stat_database_tup_fetched{datname="datawarehouse"}[1m])
+
+      - record: postgresql:connections:active
+        expr: sum(pg_stat_activity_count{datname="datawarehouse"})
+
+      - record: postgresql:connections:usage_percent
+        expr: |
+          (sum(pg_stat_activity_count{datname="datawarehouse"}) / 
+           pg_settings_max_connections) * 100
+
+      - record: postgresql:cache_hit_ratio:percent
+        expr: |
+          (
+            pg_stat_database_blks_hit{datname="datawarehouse"} /
+            (pg_stat_database_blks_hit{datname="datawarehouse"} + 
+             pg_stat_database_blks_read{datname="datawarehouse"} + 0.001)
+          ) * 100
+
+      - record: postgresql:database_size:bytes
+        expr: pg_database_size_bytes{datname="datawarehouse"}
+
+  # ===========================================
+  # Service Health
+  # ===========================================
+  - name: service_health
+    interval: 15s
+    rules:
+      - record: service:up:status
+        expr: up
+
+      - record: service:healthy:count
+        expr: count(up == 1)
+
+      - record: service:unhealthy:count
+        expr: count(up == 0)
+
+      - record: service:health:percent
+        expr: (count(up == 1) / count(up)) * 100

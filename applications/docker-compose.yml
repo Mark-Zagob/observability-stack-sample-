@@ -1,0 +1,93 @@
+# applications/docker-compose.yml
+
+services:
+  # ===========================================
+  # Data Producer - Generate fake orders
+  # ===========================================
+  data-producer:
+    build:
+      context: ./producer
+      dockerfile: Dockerfile
+    container_name: data-producer
+    restart: unless-stopped
+    environment:
+      # Kafka settings
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: ecommerce.orders
+      
+      # Producer settings
+      PRODUCE_INTERVAL_SECONDS: "1.0"
+      BATCH_SIZE: "5"
+      
+      # Metrics
+      METRICS_PORT: "8000"
+      
+      # Logging
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    networks:
+      - monitoring-net
+    # depends_on:
+    #   kafka:
+    #     condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================
+  # Data Consumer - Process orders to PostgreSQL
+  # ===========================================
+  data-consumer:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
+    container_name: data-consumer
+    restart: unless-stopped
+    environment:
+      # Kafka settings
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: ecommerce.orders
+      KAFKA_CONSUMER_GROUP: order-processor
+      
+      # PostgreSQL settings
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: datawarehouse
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      
+      # Consumer settings
+      BATCH_SIZE: "10"
+      POLL_TIMEOUT_MS: "1000"
+      
+      # Metrics
+      METRICS_PORT: "8001"
+      
+      # Logging
+      LOG_LEVEL: INFO
+    ports:
+      - "8001:8001"
+    networks:
+      - monitoring-net
+    # depends_on:
+    #   kafka:
+    #     condition: service_healthy
+    #   postgres:
+    #     condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8001/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  monitoring-net:
+    external: true

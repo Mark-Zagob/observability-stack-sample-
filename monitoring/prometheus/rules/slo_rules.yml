@@ -1,0 +1,171 @@
+# monitoring/prometheus/rules/slo_rules.yml
+
+groups:
+  # ===========================================
+  # SLI Definitions
+  # ===========================================
+  - name: sli_metrics
+    interval: 30s
+    rules:
+      # --- Producer SLIs ---
+      
+      # Availability SLI: % of time producer is up
+      - record: sli:producer:availability
+        expr: avg_over_time(up{job="data-producer"}[5m])
+
+      # Success Rate SLI: % of successful messages
+      - record: sli:producer:success_rate
+        expr: |
+          sum(rate(pipeline_producer_messages_total{status="success"}[5m])) /
+          (sum(rate(pipeline_producer_messages_total[5m])) + 0.001)
+
+      # Latency SLI: % of requests under threshold (100ms)
+      - record: sli:producer:latency_good
+        expr: |
+          sum(rate(pipeline_producer_message_duration_seconds_bucket{le="0.1"}[5m])) /
+          (sum(rate(pipeline_producer_message_duration_seconds_count[5m])) + 0.001)
+
+      # --- Consumer SLIs ---
+      
+      # Availability SLI
+      - record: sli:consumer:availability
+        expr: avg_over_time(up{job="data-consumer"}[5m])
+
+      # Success Rate SLI
+      - record: sli:consumer:success_rate
+        expr: |
+          sum(rate(pipeline_consumer_messages_total{status="success"}[5m])) /
+          (sum(rate(pipeline_consumer_messages_total[5m])) + 0.001)
+
+      # Latency SLI: % of E2E latency under threshold (5s)
+      - record: sli:consumer:latency_good
+        expr: |
+          sum(rate(pipeline_consumer_end_to_end_latency_seconds_bucket{le="5.0"}[5m])) /
+          (sum(rate(pipeline_consumer_end_to_end_latency_seconds_count[5m])) + 0.001)
+
+      # --- Pipeline SLIs ---
+      
+      # Data Freshness SLI: Consumer lag < 1000 messages
+      - record: sli:pipeline:data_freshness
+        expr: |
+          (sum(kafka_consumergroup_lag) < 1000) or vector(0)
+
+      # --- Database SLIs ---
+      
+      # Availability SLI
+      - record: sli:database:availability
+        expr: avg_over_time(pg_up[5m])
+
+      # Query Success Rate
+      - record: sli:database:query_success_rate
+        expr: |
+          sum(rate(pipeline_consumer_db_operations_total{status="success"}[5m])) /
+          (sum(rate(pipeline_consumer_db_operations_total[5m])) + 0.001)
+
+  # ===========================================
+  # SLO Calculations (Rolling Windows)
+  # ===========================================
+  - name: slo_calculations
+    interval: 1m
+    rules:
+      # --- Producer SLOs ---
+      
+      # 30-day rolling availability (target: 99.9%)
+      - record: slo:producer:availability_30d
+        expr: avg_over_time(sli:producer:availability[30d])
+
+      # 30-day rolling success rate (target: 99.9%)
+      - record: slo:producer:success_rate_30d
+        expr: avg_over_time(sli:producer:success_rate[30d])
+
+      # 30-day rolling latency compliance (target: 99%)
+      - record: slo:producer:latency_compliance_30d
+        expr: avg_over_time(sli:producer:latency_good[30d])
+
+      # --- Consumer SLOs ---
+      
+      - record: slo:consumer:availability_30d
+        expr: avg_over_time(sli:consumer:availability[30d])
+
+      - record: slo:consumer:success_rate_30d
+        expr: avg_over_time(sli:consumer:success_rate[30d])
+
+      - record: slo:consumer:latency_compliance_30d
+        expr: avg_over_time(sli:consumer:latency_good[30d])
+
+      # --- Database SLOs ---
+      
+      - record: slo:database:availability_30d
+        expr: avg_over_time(sli:database:availability[30d])
+
+      - record: slo:database:query_success_rate_30d
+        expr: avg_over_time(sli:database:query_success_rate[30d])
+
+  # ===========================================
+  # Error Budget Calculations
+  # ===========================================
+  - name: error_budget
+    interval: 1m
+    rules:
+      # --- Producer Error Budget ---
+      
+      # Error budget remaining (target 99.9% = 0.1% budget)
+      # Formula: (SLO - (1 - current_success_rate)) / (1 - SLO)
+      - record: error_budget:producer:remaining_percent
+        expr: |
+          (
+            (0.999 - (1 - sli:producer:success_rate)) / 0.001
+          ) * 100
+
+      # Error budget consumed
+      - record: error_budget:producer:consumed_percent
+        expr: 100 - error_budget:producer:remaining_percent
+
+      # --- Consumer Error Budget ---
+      
+      - record: error_budget:consumer:remaining_percent
+        expr: |
+          (
+            (0.999 - (1 - sli:consumer:success_rate)) / 0.001
+          ) * 100
+
+      - record: error_budget:consumer:consumed_percent
+        expr: 100 - error_budget:consumer:remaining_percent
+
+      # --- Combined Pipeline Error Budget ---
+      
+      - record: error_budget:pipeline:remaining_percent
+        expr: |
+          (
+            error_budget:producer:remaining_percent + 
+            error_budget:consumer:remaining_percent
+          ) / 2
+
+  # ===========================================
+  # Burn Rate Calculations
+  # ===========================================
+  - name: burn_rate
+    interval: 1m
+    rules:
+      # Burn rate = actual error rate / allowed error rate
+      # If burn rate > 1, we're consuming budget faster than allowed
+      
+      # Producer burn rate (1h window)
+      - record: burn_rate:producer:1h
+        expr: |
+          (1 - avg_over_time(sli:producer:success_rate[1h])) / 0.001
+
+      # Producer burn rate (6h window)
+      - record: burn_rate:producer:6h
+        expr: |
+          (1 - avg_over_time(sli:producer:success_rate[6h])) / 0.001
+
+      # Consumer burn rate (1h window)
+      - record: burn_rate:consumer:1h
+        expr: |
+          (1 - avg_over_time(sli:consumer:success_rate[1h])) / 0.001
+
+      # Consumer burn rate (6h window)
+      - record: burn_rate:consumer:6h
+        expr: |
+          (1 - avg_over_time(sli:consumer:success_rate[6h])) / 0.001

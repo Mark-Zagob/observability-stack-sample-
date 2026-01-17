@@ -1,0 +1,388 @@
+{
+  "uid": "data-pipeline-dashboard",
+  "title": "Data Pipeline Overview",
+  "description": "Monitoring data pipeline: Producer → Kafka → Consumer → PostgreSQL",
+  "tags": ["applications", "data-pipeline", "producer", "consumer"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+
+  "templating": {
+    "list": []
+  },
+
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+
+  "panels": [
+    {
+      "id": 1,
+      "title": "🚀 Data Pipeline Flow",
+      "type": "text",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "## Pipeline: **Producer** → **Kafka** → **Consumer** → **PostgreSQL**\n\n*Metrics sẽ hiển thị khi Producer và Consumer được khởi động.*"
+      }
+    },
+
+    {
+      "id": 2,
+      "title": "Producer Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"data-producer\"}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "WAITING",
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "gray", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 3,
+      "title": "Consumer Status",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"data-consumer\"}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "WAITING",
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "gray", "value": null }, { "color": "green", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "Messages Produced (Total)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pipeline_messages_produced_total",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 5,
+      "title": "Messages Consumed (Total)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 3 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pipeline_messages_consumed_total",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 6,
+      "title": "Production Rate (msg/s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(pipeline_messages_produced_total[1m])",
+          "legendFormat": "Produced"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(pipeline_messages_consumed_total[1m])",
+          "legendFormat": "Consumed"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max", "last"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20, "gradientMode": "scheme", "lineWidth": 2 },
+          "unit": "msg/s",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Produced" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Consumed" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+        ]
+      }
+    },
+
+    {
+      "id": 7,
+      "title": "Processing Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, rate(pipeline_processing_duration_seconds_bucket[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, rate(pipeline_processing_duration_seconds_bucket[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, rate(pipeline_processing_duration_seconds_bucket[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max", "last"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "gradientMode": "scheme", "lineWidth": 2 },
+          "unit": "s",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 8,
+      "title": "Errors",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(pipeline_errors_total{job=\"data-producer\"}[1m])",
+          "legendFormat": "Producer Errors"
+        },
+        {
+          "refId": "B",
+          "expr": "rate(pipeline_errors_total{job=\"data-consumer\"}[1m])",
+          "legendFormat": "Consumer Errors"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 30, "gradientMode": "scheme", "lineWidth": 2 },
+          "unit": "errors/s",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.1 }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 9,
+      "title": "Database Inserts (from Consumer)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(pipeline_db_inserts_total[1m])",
+          "legendFormat": "Inserts/s"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 50, "gradientMode": "hue", "lineWidth": 1 },
+          "unit": "ops",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 10,
+      "title": "Orders by Category (Real-time)",
+      "type": "piechart",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (category) (pipeline_orders_by_category)",
+          "legendFormat": "{{category}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "pieType": "donut",
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 11,
+      "title": "Revenue Generated",
+      "type": "stat",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "pipeline_total_revenue",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "noValue": "$0",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 12,
+      "title": "Pipeline Health Score",
+      "type": "gauge",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(1 - (rate(pipeline_errors_total[5m]) / (rate(pipeline_messages_produced_total[5m]) + 0.001))) * 100",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "noValue": "N/A",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 90 }, { "color": "green", "value": 99 }] }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

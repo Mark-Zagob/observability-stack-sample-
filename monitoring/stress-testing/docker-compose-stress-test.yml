@@ -1,0 +1,21 @@
+# stress-testing/docker-compose.yml
+
+services:
+  load-test:
+    build:
+      context: ./load-test
+      dockerfile: Dockerfile
+    container_name: load-test
+    networks:
+      - monitoring-net
+    ports:
+      - "8002:8002"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC=ecommerce.orders
+    # Command sẽ được override khi chạy
+    command: ["--help"]
+
+networks:
+  monitoring-net:
+    external: true

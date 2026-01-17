@@ -1,0 +1,314 @@
+# monitoring/prometheus/rules/alert_rules.yml
+
+groups:
+  # ===========================================
+  # Service Health Alerts
+  # ===========================================
+  - name: service_health_alerts
+    rules:
+      # Service Down - Critical
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been down for more than 1 minute."
+          runbook_url: "https://wiki.example.com/runbook/service-down"
+
+      # Service Flapping - Warning
+      - alert: ServiceFlapping
+        expr: changes(up[10m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service {{ $labels.job }} is flapping"
+          description: "{{ $labels.job }} has changed state {{ $value }} times in the last 10 minutes."
+
+  # ===========================================
+  # Data Pipeline Alerts
+  # ===========================================
+  - name: pipeline_alerts
+    rules:
+      # Producer Down
+      - alert: ProducerDown
+        expr: up{job="data-producer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: producer
+        annotations:
+          summary: "Data Producer is down"
+          description: "Data Producer has been down for more than 1 minute. No data is being produced to Kafka."
+
+      # Consumer Down
+      - alert: ConsumerDown
+        expr: up{job="data-consumer"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: consumer
+        annotations:
+          summary: "Data Consumer is down"
+          description: "Data Consumer has been down for more than 1 minute. No data is being processed."
+
+      # Producer Not Producing
+      - alert: ProducerNotProducing
+        expr: rate(pipeline_messages_produced_total{status="success"}[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: producer
+        annotations:
+          summary: "Producer is not producing messages"
+          description: "No messages have been produced in the last 5 minutes."
+
+      # Consumer Not Consuming
+      - alert: ConsumerNotConsuming
+        expr: rate(pipeline_messages_consumed_total{status="success"}[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: consumer
+        annotations:
+          summary: "Consumer is not consuming messages"
+          description: "No messages have been consumed in the last 5 minutes."
+
+      # High Error Rate - Producer
+      - alert: ProducerHighErrorRate
+        expr: |
+          (
+            rate(pipeline_messages_produced_total{status="failed"}[5m]) /
+            (rate(pipeline_messages_produced_total[5m]) + 0.001)
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: producer
+        annotations:
+          summary: "Producer error rate is high"
+          description: "Producer error rate is {{ $value | printf \"%.2f\" }}% (threshold: 5%)."
+
+      # High Error Rate - Consumer
+      - alert: ConsumerHighErrorRate
+        expr: |
+          (
+            rate(pipeline_messages_consumed_total{status="failed"}[5m]) /
+            (rate(pipeline_messages_consumed_total[5m]) + 0.001)
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: consumer
+        annotations:
+          summary: "Consumer error rate is high"
+          description: "Consumer error rate is {{ $value | printf \"%.2f\" }}% (threshold: 5%)."
+
+      # High Processing Latency
+      - alert: HighProcessingLatency
+        expr: pipeline:processing_latency_p95:seconds > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: consumer
+        annotations:
+          summary: "Processing latency is high"
+          description: "P95 processing latency is {{ $value | printf \"%.2f\" }}s (threshold: 1s)."
+
+  # ===========================================
+  # Kafka Alerts
+  # ===========================================
+  - name: kafka_alerts
+    rules:
+      # Kafka Down
+      - alert: KafkaDown
+        expr: up{job="kafka"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka exporter is down"
+          description: "Cannot scrape Kafka metrics. Kafka might be down."
+
+      # High Consumer Lag
+      - alert: KafkaHighConsumerLag
+        expr: kafka:consumer_lag:sum > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Kafka consumer lag is high"
+          description: "Total consumer lag is {{ $value }} messages (threshold: 1000)."
+
+      # Critical Consumer Lag
+      - alert: KafkaCriticalConsumerLag
+        expr: kafka:consumer_lag:sum > 10000
+        for: 5m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka consumer lag is critical"
+          description: "Total consumer lag is {{ $value }} messages (threshold: 10000). Consumer might be stuck."
+
+      # No Messages Flowing
+      - alert: KafkaNoMessagesFlowing
+        expr: kafka:messages_in:rate1m:total == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "No messages flowing through Kafka"
+          description: "No messages have been produced to Kafka in the last 10 minutes."
+
+  # ===========================================
+  # PostgreSQL Alerts
+  # ===========================================
+  - name: postgresql_alerts
+    rules:
+      # PostgreSQL Down
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is not responding."
+
+      # High Connection Usage
+      - alert: PostgreSQLHighConnections
+        expr: postgresql:connections:usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL connection usage is high"
+          description: "Connection usage is {{ $value | printf \"%.1f\" }}% (threshold: 80%)."
+
+      # Critical Connection Usage
+      - alert: PostgreSQLCriticalConnections
+        expr: postgresql:connections:usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL connection usage is critical"
+          description: "Connection usage is {{ $value | printf \"%.1f\" }}% (threshold: 95%). New connections may fail."
+
+      # Low Cache Hit Ratio
+      - alert: PostgreSQLLowCacheHitRatio
+        expr: postgresql:cache_hit_ratio:percent < 90
+        for: 10m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL cache hit ratio is low"
+          description: "Cache hit ratio is {{ $value | printf \"%.1f\" }}% (threshold: 90%). Consider increasing shared_buffers."
+
+      # Deadlocks Detected
+      - alert: PostgreSQLDeadlocks
+        expr: increase(pg_stat_database_deadlocks{datname="datawarehouse"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: "PostgreSQL deadlocks detected"
+          description: "{{ $value }} deadlocks detected in the last 5 minutes."
+
+  # ===========================================
+  # Container Resource Alerts (Fixed)
+  # ===========================================
+  - name: container_alerts
+    rules:
+      # High CPU Usage
+      - alert: ContainerHighCPU
+        expr: container:cpu_usage_percent:rate5m > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} has high CPU usage"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 80%)."
+
+      # Critical CPU Usage
+      - alert: ContainerCriticalCPU
+        expr: container:cpu_usage_percent:rate5m > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} has critical CPU usage"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 95%)."
+
+      # High Memory Usage (chỉ cho containers có limit)
+      - alert: ContainerHighMemory
+        expr: |
+          (
+            container_memory_usage_bytes{name=~".+"} /
+            container_spec_memory_limit_bytes{name=~".+"}
+          ) * 100 > 80
+          and
+          container_spec_memory_limit_bytes{name=~".+"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} has high memory usage"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% of limit (threshold: 80%)."
+
+      # Critical Memory Usage (chỉ cho containers có limit)
+      - alert: ContainerCriticalMemory
+        expr: |
+          (
+            container_memory_usage_bytes{name=~".+"} /
+            container_spec_memory_limit_bytes{name=~".+"}
+          ) * 100 > 95
+          and
+          container_spec_memory_limit_bytes{name=~".+"} > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} has critical memory usage"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% of limit (threshold: 95%). OOM kill imminent."
+
+      # High Memory Usage (absolute - cho containers không có limit)
+      - alert: ContainerHighMemoryAbsolute
+        expr: container_memory_usage_bytes{name=~".+"} > 1073741824
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} using high memory"
+          description: "Memory usage is {{ $value | humanize1024 }}B (threshold: 1GB)."
+
+      # Critical Memory Usage (absolute - cho containers không có limit)
+      - alert: ContainerCriticalMemoryAbsolute
+        expr: container_memory_usage_bytes{name=~".+"} > 2147483648
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} using critical memory"
+          description: "Memory usage is {{ $value | humanize1024 }}B (threshold: 2GB)."
+
+      # Container Restarting
+      - alert: ContainerRestarting
+        expr: increase(container_restart_count{name=~".+"}[1h]) > 3
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} is restarting frequently"
+          description: "Container has restarted {{ $value | printf \"%.0f\" }} times in the last hour."

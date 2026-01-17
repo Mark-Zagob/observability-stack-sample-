@@ -1,0 +1,657 @@
+{
+  "uid": "slo-dashboard",
+  "title": "SLI/SLO Dashboard",
+  "description": "Service Level Indicators and Objectives monitoring",
+  "tags": ["slo", "sre", "reliability"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+
+  "templating": {
+    "list": []
+  },
+
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+
+  "panels": [
+    {
+      "id": 100,
+      "title": "",
+      "type": "text",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "## 🎯 SLI/SLO Dashboard\n\n| Service | SLO Target | Error Budget (30d) |\n|---------|------------|--------------------|\n| Producer Success Rate | 99.9% | 43.2 min |\n| Consumer Success Rate | 99.9% | 43.2 min |\n| Latency P95 | < 100ms (Producer), < 5s (E2E) | - |"
+      }
+    },
+
+    {
+      "id": 1,
+      "title": "📊 ERROR BUDGET STATUS",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
+      "collapsed": false
+    },
+
+    {
+      "id": 2,
+      "title": "Producer Error Budget",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "error_budget:producer:remaining_percent",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 20 },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 75 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 3,
+      "title": "Consumer Error Budget",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "error_budget:consumer:remaining_percent",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 20 },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 75 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "Producer Burn Rate (1h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 3, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "burn_rate:producer:1h",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "x",
+          "decimals": 2,
+          "noValue": "0",
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "orange", "value": 6 },
+              { "color": "red", "value": 14.4 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 5,
+      "title": "Consumer Burn Rate (1h)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 3, "x": 15, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "burn_rate:consumer:1h",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "x",
+          "decimals": 2,
+          "noValue": "0",
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "orange", "value": 6 },
+              { "color": "red", "value": 14.4 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 6,
+      "title": "Error Budget Burn Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "error_budget:producer:consumed_percent",
+          "legendFormat": "Producer Consumed"
+        },
+        {
+          "refId": "B",
+          "expr": "error_budget:consumer:consumed_percent",
+          "legendFormat": "Consumer Consumed"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 10,
+      "title": "📈 SLI METRICS",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 10 },
+      "collapsed": false
+    },
+
+    {
+      "id": 11,
+      "title": "Producer Success Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sli:producer:success_rate * 100",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 3,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 99 },
+              { "color": "green", "value": 99.9 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 12,
+      "title": "Consumer Success Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sli:consumer:success_rate * 100",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 3,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 99 },
+              { "color": "green", "value": 99.9 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 13,
+      "title": "Producer Latency Compliance",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sli:producer:latency_good * 100",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 14,
+      "title": "E2E Latency Compliance",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sli:consumer:latency_good * 100",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 15,
+      "title": "Database Availability",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sli:database:availability * 100",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 3,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 99 },
+              { "color": "green", "value": 99.95 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 16,
+      "title": "Consumer Lag",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 11 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(kafka_consumergroup_lag)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "0",
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 1000 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 20,
+      "title": "SLI Trends Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sli:producer:success_rate * 100",
+          "legendFormat": "Producer Success Rate"
+        },
+        {
+          "refId": "B",
+          "expr": "sli:consumer:success_rate * 100",
+          "legendFormat": "Consumer Success Rate"
+        },
+        {
+          "refId": "C",
+          "expr": "99.9",
+          "legendFormat": "SLO Target (99.9%)"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "min"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "lineWidth": 2 },
+          "unit": "percent",
+          "min": 99,
+          "max": 100
+        },
+        "overrides": [
+          { 
+            "matcher": { "id": "byName", "options": "SLO Target (99.9%)" }, 
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ] 
+          }
+        ]
+      }
+    },
+
+    {
+      "id": 21,
+      "title": "Burn Rate Trend",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "burn_rate:producer:1h",
+          "legendFormat": "Producer (1h)"
+        },
+        {
+          "refId": "B",
+          "expr": "burn_rate:consumer:1h",
+          "legendFormat": "Consumer (1h)"
+        },
+        {
+          "refId": "C",
+          "expr": "1",
+          "legendFormat": "Normal Rate (1x)"
+        },
+        {
+          "refId": "D",
+          "expr": "14.4",
+          "legendFormat": "Critical (14.4x)"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "lineWidth": 2 },
+          "unit": "x",
+          "min": 0
+        },
+        "overrides": [
+          { 
+            "matcher": { "id": "byName", "options": "Normal Rate (1x)" }, 
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+            ] 
+          },
+          { 
+            "matcher": { "id": "byName", "options": "Critical (14.4x)" }, 
+            "properties": [
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } },
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ] 
+          }
+        ]
+      }
+    },
+
+    {
+      "id": 30,
+      "title": "📋 SLO SUMMARY TABLE",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false
+    },
+
+    {
+      "id": 31,
+      "title": "SLO Status",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sli:producer:success_rate * 100",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "expr": "sli:consumer:success_rate * 100",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "C",
+          "expr": "sli:database:availability * 100",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "D",
+          "expr": "error_budget:producer:remaining_percent",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "E",
+          "expr": "error_budget:consumer:remaining_percent",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        { 
+          "id": "organize", 
+          "options": { 
+            "excludeByName": { "Time": true },
+            "renameByName": { 
+              "Value #A": "Producer Success %",
+              "Value #B": "Consumer Success %",
+              "Value #C": "Database Availability %",
+              "Value #D": "Producer Budget %",
+              "Value #E": "Consumer Budget %"
+            }
+          } 
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "center", "displayMode": "color-background-solid" },
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 99 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    }
+  ]
+}

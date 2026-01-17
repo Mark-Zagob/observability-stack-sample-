@@ -1,0 +1,71 @@
+# monitoring/grafana/provisioning/dashboards/dashboards.yml
+
+apiVersion: 1
+
+providers:
+  # ===========================================
+  # Overview Dashboards
+  # ===========================================
+  - name: 'overview'
+    orgId: 1
+    folder: 'Overview'
+    folderUid: 'overview'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true              # ✅  cho edit trên UI
+    options:
+      path: /var/lib/grafana/dashboards/overview
+
+  # ===========================================
+  # Infrastructure Dashboards
+  # ===========================================
+  - name: 'infrastructure'
+    orgId: 1
+    folder: 'Infrastructure'
+    folderUid: 'infrastructure'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards/infrastructure
+
+  # ===========================================
+  # Application Dashboards
+  # ===========================================
+  - name: 'applications'
+    orgId: 1
+    folder: 'Applications'
+    folderUid: 'applications'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards/applications
+
+  # ===========================================
+  # Logs Dashboards
+  # ===========================================
+  - name: 'logs'
+    orgId: 1
+    folder: 'Logs'
+    folderUid: 'logs'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards/logs
+
+  - name: 'tracing'
+    orgId: 1
+    folder: 'Tracing'
+    folderUid: 'tracing'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards/tracing

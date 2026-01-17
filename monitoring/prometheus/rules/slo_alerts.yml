@@ -1,0 +1,194 @@
+# monitoring/prometheus/rules/slo_alerts.yml
+
+groups:
+  # ===========================================
+  # Error Budget Alerts
+  # ===========================================
+  - name: error_budget_alerts
+    rules:
+      # Producer error budget low
+      - alert: ProducerErrorBudgetLow
+        expr: error_budget:producer:remaining_percent < 50
+        for: 5m
+        labels:
+          severity: warning
+          service: producer
+          category: slo
+        annotations:
+          summary: "Producer error budget is running low"
+          description: "Producer has consumed {{ $value | printf \"%.1f\" }}% of its error budget."
+
+      # Producer error budget critical
+      - alert: ProducerErrorBudgetCritical
+        expr: error_budget:producer:remaining_percent < 20
+        for: 5m
+        labels:
+          severity: critical
+          service: producer
+          category: slo
+        annotations:
+          summary: "Producer error budget is critically low"
+          description: "Producer has only {{ $value | printf \"%.1f\" }}% error budget remaining. Consider freezing deployments."
+
+      # Producer error budget exhausted
+      - alert: ProducerErrorBudgetExhausted
+        expr: error_budget:producer:remaining_percent <= 0
+        for: 1m
+        labels:
+          severity: critical
+          service: producer
+          category: slo
+        annotations:
+          summary: "Producer error budget exhausted!"
+          description: "Producer has exhausted its error budget. SLO is being violated."
+
+      # Consumer error budget alerts
+      - alert: ConsumerErrorBudgetLow
+        expr: error_budget:consumer:remaining_percent < 50
+        for: 5m
+        labels:
+          severity: warning
+          service: consumer
+          category: slo
+        annotations:
+          summary: "Consumer error budget is running low"
+          description: "Consumer has consumed {{ $value | printf \"%.1f\" }}% of its error budget."
+
+      - alert: ConsumerErrorBudgetCritical
+        expr: error_budget:consumer:remaining_percent < 20
+        for: 5m
+        labels:
+          severity: critical
+          service: consumer
+          category: slo
+        annotations:
+          summary: "Consumer error budget is critically low"
+          description: "Consumer has only {{ $value | printf \"%.1f\" }}% error budget remaining."
+
+  # ===========================================
+  # Burn Rate Alerts (Multi-window)
+  # ===========================================
+  - name: burn_rate_alerts
+    rules:
+      # Fast burn - will exhaust budget in ~2 hours
+      # 1h window with 14.4x burn rate
+      - alert: ProducerHighBurnRate
+        expr: |
+          burn_rate:producer:1h > 14.4
+          and
+          burn_rate:producer:6h > 6
+        for: 2m
+        labels:
+          severity: critical
+          service: producer
+          category: slo
+        annotations:
+          summary: "Producer is burning error budget too fast"
+          description: "Producer burn rate is {{ $value | printf \"%.1f\" }}x. At this rate, error budget will be exhausted in ~2 hours."
+
+      # Slow burn - will exhaust budget in ~1 day
+      - alert: ProducerModerateBurnRate
+        expr: |
+          burn_rate:producer:6h > 6
+          and
+          burn_rate:producer:1h > 3
+        for: 15m
+        labels:
+          severity: warning
+          service: producer
+          category: slo
+        annotations:
+          summary: "Producer burn rate is elevated"
+          description: "Producer burn rate is {{ $value | printf \"%.1f\" }}x. Error budget may be exhausted within a day."
+
+      # Consumer burn rate alerts
+      - alert: ConsumerHighBurnRate
+        expr: |
+          burn_rate:consumer:1h > 14.4
+          and
+          burn_rate:consumer:6h > 6
+        for: 2m
+        labels:
+          severity: critical
+          service: consumer
+          category: slo
+        annotations:
+          summary: "Consumer is burning error budget too fast"
+          description: "Consumer burn rate is {{ $value | printf \"%.1f\" }}x."
+
+      - alert: ConsumerModerateBurnRate
+        expr: |
+          burn_rate:consumer:6h > 6
+          and
+          burn_rate:consumer:1h > 3
+        for: 15m
+        labels:
+          severity: warning
+          service: consumer
+          category: slo
+        annotations:
+          summary: "Consumer burn rate is elevated"
+          description: "Consumer burn rate is {{ $value | printf \"%.1f\" }}x."
+
+  # ===========================================
+  # SLO Violation Alerts
+  # ===========================================
+  - name: slo_violation_alerts
+    rules:
+      # Producer SLO violations
+      - alert: ProducerSLOViolation
+        expr: sli:producer:success_rate < 0.999
+        for: 5m
+        labels:
+          severity: warning
+          service: producer
+          category: slo
+        annotations:
+          summary: "Producer SLO is being violated"
+          description: "Producer success rate is {{ $value | printf \"%.3f\" }} (target: 0.999)"
+
+      - alert: ProducerLatencySLOViolation
+        expr: sli:producer:latency_good < 0.99
+        for: 5m
+        labels:
+          severity: warning
+          service: producer
+          category: slo
+        annotations:
+          summary: "Producer latency SLO is being violated"
+          description: "Only {{ $value | printf \"%.1f\" }}% of requests are under 100ms (target: 99%)"
+
+      # Consumer SLO violations
+      - alert: ConsumerSLOViolation
+        expr: sli:consumer:success_rate < 0.999
+        for: 5m
+        labels:
+          severity: warning
+          service: consumer
+          category: slo
+        annotations:
+          summary: "Consumer SLO is being violated"
+          description: "Consumer success rate is {{ $value | printf \"%.3f\" }} (target: 0.999)"
+
+      - alert: ConsumerLatencySLOViolation
+        expr: sli:consumer:latency_good < 0.99
+        for: 5m
+        labels:
+          severity: warning
+          service: consumer
+          category: slo
+        annotations:
+          summary: "Consumer E2E latency SLO is being violated"
+          description: "Only {{ $value | printf \"%.1f\" }}% of messages are processed under 5s (target: 99%)"
+
+      # Data freshness SLO
+      - alert: DataFreshnessSLOViolation
+        expr: sum(kafka_consumergroup_lag) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          service: pipeline
+          category: slo
+        annotations:
+          summary: "Data freshness SLO is being violated"
+          description: "Consumer lag is {{ $value }} messages (threshold: 1000)"

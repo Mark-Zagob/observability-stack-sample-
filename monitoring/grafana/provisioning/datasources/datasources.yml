@@ -1,0 +1,72 @@
+# monitoring/grafana/provisioning/datasources/datasources.yml
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus                    # ✅ UID cố định - RẤT QUAN TRỌNG!
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true                    # Không cho edit trên UI để tránh drift
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST                 # POST tốt hơn cho large queries
+
+  - name: Alertmanager
+    type: alertmanager
+    uid: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    editable: false
+    jsonData:
+      implementation: prometheus
+
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      timeout: 60
+      maxLines: 1000
+      derivedFields:
+        # Link từ logs sang related logs by order_id
+        - name: order_id
+          matcherRegex: '"order_id":\s*"([^"]+)"'
+          url: '/explore?orgId=1&left={"datasource":"loki","queries":[{"expr":"{service=~\"data-producer|data-consumer\"} |= \"$${__value.raw}\""}]}'
+          datasourceUid: loki
+          urlDisplayLabel: "View related logs"
+        
+        # Link từ logs sang metrics by service
+        - name: service_metrics
+          matcherRegex: '"service":\s*"([^"]+)"'
+          url: '/explore?orgId=1&left={"datasource":"prometheus","queries":[{"expr":"up{job=\"$${__value.raw}\"}"}]}'
+          datasourceUid: prometheus
+          urlDisplayLabel: "View metrics"
+
+        - name: TraceID
+          matcherRegex: '"trace_id":\s*"([a-f0-9]+)"'
+          url: '$${__value.raw}'
+          datasourceUid: jaeger
+          urlDisplayLabel: "View Trace"
+
+  - name: Jaeger
+    type: jaeger
+    uid: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: false
+    jsonData:
+      tracesToLogs:
+        datasourceUid: loki
+        tags: ['service']
+        mappedTags: [{ key: 'service.name', value: 'service' }]
+        mapTagNamesEnabled: true
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        filterBySpanID: false
+        lokiSearch: true

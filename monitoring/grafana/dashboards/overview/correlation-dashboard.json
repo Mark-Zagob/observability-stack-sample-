@@ -1,0 +1,244 @@
+{
+  "uid": "correlation-dashboard",
+  "title": "Metrics & Logs Correlation",
+  "description": "View metrics and related logs side by side",
+  "tags": ["correlation", "metrics", "logs", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "custom",
+        "query": "data-producer,data-consumer",
+        "current": { "text": "data-producer", "value": "data-producer" },
+        "options": [
+          { "text": "data-producer", "value": "data-producer", "selected": true },
+          { "text": "data-consumer", "value": "data-consumer", "selected": false }
+        ]
+      }
+    ]
+  },
+
+  "annotations": {
+    "list": [
+      {
+        "name": "Errors",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "enable": true,
+        "iconColor": "red",
+        "expr": "{service=\"$service\"} |= \"ERROR\"",
+        "titleFormat": "Error",
+        "textFormat": "{{ __line__ }}"
+      }
+    ]
+  },
+
+  "panels": [
+    {
+      "id": 1,
+      "title": "📊 Metrics Overview",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+
+    {
+      "id": 2,
+      "title": "Message Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pipeline_producer_messages_total{status=\"success\"}[1m])) * 60",
+          "legendFormat": "Producer"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(pipeline_consumer_messages_total{status=\"success\"}[1m])) * 60",
+          "legendFormat": "Consumer"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "msg/min"
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 3,
+      "title": "Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pipeline_producer_messages_total{status=\"failed\"}[1m])) * 60",
+          "legendFormat": "Producer Errors"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(pipeline_consumer_messages_total{status=\"failed\"}[1m])) * 60",
+          "legendFormat": "Consumer Errors"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "short",
+          "noValue": "0"
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "/Error/" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+        ]
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "Latency P95",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, rate(pipeline_producer_message_duration_seconds_bucket[5m]))",
+          "legendFormat": "Producer P95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, rate(pipeline_consumer_end_to_end_latency_seconds_bucket[5m]))",
+          "legendFormat": "Consumer E2E P95"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "lineWidth": 2 },
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 10,
+      "title": "📝 Related Logs",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "collapsed": false
+    },
+
+    {
+      "id": 11,
+      "title": "Log Volume (matches time range above)",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 9 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (level) (count_over_time({service=\"$service\"} | json | __error__=\"\" [$__interval]))",
+          "legendFormat": "{{level}}"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1, "stacking": { "mode": "normal" } },
+          "unit": "short"
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "ERROR" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "INFO" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "WARNING" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] }
+        ]
+      }
+    },
+
+    {
+      "id": 12,
+      "title": "Service Logs",
+      "type": "logs",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 13 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=\"$service\"}",
+          "maxLines": 200
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    },
+
+    {
+      "id": 20,
+      "title": "🔴 Error Logs Only",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "collapsed": false
+    },
+
+    {
+      "id": 21,
+      "title": "Error Logs",
+      "type": "logs",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 26 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=\"$service\"} |~ \"(?i)error|ERROR\"",
+          "maxLines": 100
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

@@ -1,0 +1,327 @@
+{
+  "uid": "logs-dashboard",
+  "title": "Logs Explorer",
+  "description": "Centralized logs from all services",
+  "tags": ["logs", "loki", "observability"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values(service)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "level",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "loki" },
+        "query": "label_values(level)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "selected": true, "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "search",
+        "type": "textbox",
+        "current": { "value": "" },
+        "label": "Search"
+      }
+    ]
+  },
+
+  "annotations": {
+    "list": []
+  },
+
+  "panels": [
+    {
+      "id": 1,
+      "title": "Log Volume",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (count_over_time({service=~\"$service\"} [$__interval]))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["sum"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 50, "lineWidth": 1, "stacking": { "mode": "normal" } },
+          "unit": "short"
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 2,
+      "title": "Error Logs",
+      "type": "timeseries",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (count_over_time({service=~\"$service\"} |= \"ERROR\" [$__interval]))",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "bars", "fillOpacity": 70, "lineWidth": 1 },
+          "unit": "short",
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        },
+        "overrides": []
+      }
+    },
+     {
+      "id": 3,
+      "title": "Logs by Level",
+      "type": "piechart",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 6 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (level) (count_over_time({service=~\"$service\"} | json | level=~\".+\" | __error__=\"\" [$__range]))",
+          "legendFormat": "{{level}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "pieType": "donut",
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "INFO": { "color": "green", "index": 0 },
+                "info": { "color": "green", "index": 1 },
+                "ERROR": { "color": "red", "index": 2 },
+                "error": { "color": "red", "index": 3 },
+                "WARNING": { "color": "yellow", "index": 4 },
+                "warning": { "color": "yellow", "index": 5 },
+                "WARN": { "color": "yellow", "index": 6 },
+                "warn": { "color": "yellow", "index": 7 },
+                "DEBUG": { "color": "blue", "index": 8 },
+                "debug": { "color": "blue", "index": 9 }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 4,
+      "title": "Recent Errors",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 6 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({service=~\"$service\"} |= \"ERROR\" [5m]))",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": { 
+            "mode": "absolute", 
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ] 
+          }
+        },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 10,
+      "title": "📋 LOG STREAM",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "collapsed": false
+    },
+
+    {
+      "id": 11,
+      "title": "All Logs",
+      "type": "logs",
+      "gridPos": { "h": 15, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=~\"$service\", level=~\"$level\"} |~ \"$search\"",
+          "maxLines": 500
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      }
+    },
+
+    {
+      "id": 20,
+      "title": "🔍 SERVICE LOGS",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 27 },
+      "collapsed": false
+    },
+
+    {
+      "id": 21,
+      "title": "Producer Logs",
+      "type": "logs",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=\"data-producer\"} |~ \"$search\"",
+          "maxLines": 200
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    },
+
+    {
+      "id": 22,
+      "title": "Consumer Logs",
+      "type": "logs",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=\"data-consumer\"} |~ \"$search\"",
+          "maxLines": 200
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    },
+
+    {
+      "id": 30,
+      "title": "📊 BUSINESS EVENTS",
+      "type": "row",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 38 },
+      "collapsed": false
+    },
+
+    {
+      "id": 31,
+      "title": "Order Events",
+      "type": "logs",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 39 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=~\"data-producer|data-consumer\"} |= \"order\" | json",
+          "maxLines": 100
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    },
+
+    {
+      "id": 32,
+      "title": "Batch Events",
+      "type": "logs",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 39 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service=~\"data-producer|data-consumer\"} |= \"batch\" | json",
+          "maxLines": 100
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+networks:
+  monitoring-net:
+    name: monitoring-net
+    driver: bridge

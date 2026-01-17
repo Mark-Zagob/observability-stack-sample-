@@ -1,0 +1,75 @@
+# monitoring/alertmanager/alertmanager.yml
+
+global:
+  # Thời gian chờ trước khi gửi lại alert nếu vẫn còn firing
+  resolve_timeout: 5m
+
+# Route tree - định tuyến alerts
+route:
+  # Default receiver
+  receiver: 'default-receiver'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'service']
+  
+  # Thời gian chờ trước khi gửi group đầu tiên
+  group_wait: 30s
+  
+  # Thời gian chờ trước khi gửi alerts mới trong cùng group
+  group_interval: 5m
+  
+  # Thời gian chờ trước khi gửi lại alert đã gửi
+  repeat_interval: 4h
+
+  # Child routes - routing dựa trên labels
+  routes:
+    # Critical alerts - gửi ngay
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      repeat_interval: 4h
+
+    # Info alerts - ít urgent hơn
+    - match:
+        severity: info
+      receiver: 'default-receiver'
+      repeat_interval: 12h
+
+# Inhibition rules - suppress alerts
+inhibit_rules:
+  # Nếu critical đang fire, suppress warning cùng service
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+
+# Receivers - nơi nhận alerts
+receivers:
+  - name: 'default-receiver'
+    # Webhook để test (có thể xem trong Alertmanager UI)
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+
+  - name: 'critical-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+    # Có thể thêm Slack, Email, PagerDuty ở đây
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/xxx/yyy/zzz'
+    #     channel: '#alerts-critical'
+    #     send_resolved: true
+
+  - name: 'warning-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
